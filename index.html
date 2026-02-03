@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Office Toss Physics Lab</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Office Toss Physics Lab</h1>
+      <p>
+        Learn projectile motion by tossing office garbage into a moving dustbin while
+        wind and office drafts fight you!
+      </p>
+    </header>
+
+    <main>
+      <section class="game-shell">
+        <canvas id="game" width="900" height="520" aria-label="Garbage throw game"></canvas>
+        <div class="panel">
+          <div class="panel-section">
+            <h2>Throw Controls</h2>
+            <label>
+              Angle (<span id="angleValue">45</span>°)
+              <input type="range" id="angle" min="10" max="80" value="45" />
+            </label>
+            <label>
+              Power (<span id="powerValue">45</span> m/s)
+              <input type="range" id="power" min="15" max="70" value="45" />
+            </label>
+            <label>
+              Garbage Type
+              <select id="garbageType"></select>
+            </label>
+            <button id="throwBtn">Throw!</button>
+            <button id="resetBtn">Reset Level</button>
+          </div>
+
+          <div class="panel-section">
+            <h2>Physics Dashboard</h2>
+            <ul>
+              <li>Gravity: <strong><span id="gravityValue"></span> m/s²</strong></li>
+              <li>Wind: <strong><span id="windValue"></span> m/s²</strong></li>
+              <li>Gust: <strong><span id="gustValue"></span></strong></li>
+              <li>Drag Coefficient: <strong><span id="dragValue"></span></strong></li>
+              <li>Mass: <strong><span id="massValue"></span> kg</strong></li>
+            </ul>
+          </div>
+
+          <div class="panel-section">
+            <h2>Level Objectives</h2>
+            <p id="levelInfo"></p>
+            <p class="tip" id="physicsTip"></p>
+            <p class="status" id="status"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="instructions">
+        <h2>How to Play</h2>
+        <ol>
+          <li>Pick a garbage object. Different shapes have different drag.</li>
+          <li>Adjust angle and power to match the moving bin.</li>
+          <li>Watch wind and gusts (fans/windows) change during the throw.</li>
+          <li>Land the garbage in the bin to advance to the next level.</li>
+        </ol>
+        <p>
+          Physics focus: projectile motion, vectors, drag, mass, acceleration, and
+          relative motion.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p>Built as a fun physics playground for all ages.</p>
+    </footer>
+
+    <script src="game.js"></script>
+  </body>
+</html>
