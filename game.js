@@ -16,6 +16,7 @@ const dragValue = document.getElementById("dragValue");
 const massValue = document.getElementById("massValue");
 const levelInfo = document.getElementById("levelInfo");
 const physicsTip = document.getElementById("physicsTip");
+const throwsLeft = document.getElementById("throwsLeft");
 const status = document.getElementById("status");
 
 const office = {
@@ -79,11 +80,14 @@ let wind = 0;
 let gust = 0;
 let gustTimer = 0;
 let lastTime = 0;
+let statusTimeout = null;
 
 const emitter = {
   x: office.leftWall + 20,
   y: office.floorY - 10,
 };
+
+const maxThrows = 3;
 
 function populateGarbage() {
   garbageOptions.forEach((item, index) => {
@@ -110,7 +114,7 @@ function initLevel() {
   gust = 0;
   gustTimer = 0;
   updateUI();
-  status.textContent = "Take your shot!";
+  setStatus("Take your shot!");
 }
 
 function updateUI() {
@@ -125,6 +129,20 @@ function updateUI() {
   massValue.textContent = selected.mass.toFixed(2);
   levelInfo.textContent = `Level ${currentLevel + 1}: ${level.name}. Bin size ${level.bin.width}x${level.bin.height}, speed ${level.bin.speed.toFixed(1)}.`;
   physicsTip.textContent = physicsTips[currentLevel % physicsTips.length];
+  throwsLeft.textContent = Math.max(maxThrows - throwCount, 0);
+}
+
+function setStatus(message, timeout = 0) {
+  status.textContent = message;
+  if (statusTimeout) {
+    clearTimeout(statusTimeout);
+  }
+  if (timeout > 0) {
+    statusTimeout = setTimeout(() => {
+      status.textContent = "";
+      statusTimeout = null;
+    }, timeout);
+  }
 }
 
 function createProjectile() {
@@ -160,11 +178,11 @@ function updateProjectile(delta) {
   projectile.rotation += projectile.vx * 0.01;
 
   if (projectile.y > office.floorY - 5) {
-    status.textContent = "Missed! Adjust your throw and try again.";
+    setStatus("Missed! Adjust your throw and try again.", 2000);
     projectile = null;
     throwCount += 1;
-    if (throwCount >= 3) {
-      status.textContent = "Three throws used. Reset the level for another try.";
+    if (throwCount >= maxThrows) {
+      setStatus("Three throws used. Reset the level for another try.");
     }
   }
 }
@@ -200,7 +218,7 @@ function checkScoring() {
   const hitX = projectile.x > bin.x && projectile.x < bin.x + bin.width;
   const hitY = projectile.y > bin.y && projectile.y < bin.y + bin.height;
   if (hitX && hitY) {
-    status.textContent = "Score! Great physics intuition.";
+    setStatus("Score! Great physics intuition.", 1500);
     projectile = null;
     currentLevel = Math.min(currentLevel + 1, levels.length - 1);
     initLevel();
@@ -209,8 +227,24 @@ function checkScoring() {
 
 function drawOffice() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  skyGradient.addColorStop(0, "#dbeafe");
+  skyGradient.addColorStop(0.45, "#e0f2fe");
+  skyGradient.addColorStop(0.7, "#fef3c7");
+  skyGradient.addColorStop(1, "#fde68a");
+  ctx.fillStyle = skyGradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   ctx.fillStyle = "#d1d5db";
   ctx.fillRect(0, office.floorY, canvas.width, canvas.height - office.floorY);
+
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.4)";
+  for (let i = office.floorY; i < canvas.height; i += 12) {
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(canvas.width, i);
+    ctx.stroke();
+  }
 
   ctx.fillStyle = "#fef3c7";
   ctx.fillRect(office.leftWall - 40, office.ceiling - 10, 120, 60);
@@ -225,6 +259,11 @@ function drawOffice() {
   ctx.fillRect(office.rightWall - 160, office.ceiling, 110, 80);
   ctx.fillStyle = "#38bdf8";
   ctx.fillRect(office.rightWall - 150, office.ceiling + 10, 90, 60);
+
+  ctx.fillStyle = "#0f172a";
+  ctx.globalAlpha = 0.2;
+  ctx.fillRect(office.rightWall - 145, office.ceiling + 16, 80, 6);
+  ctx.globalAlpha = 1;
 
   ctx.fillStyle = "#f97316";
   ctx.beginPath();
@@ -243,19 +282,30 @@ function drawOffice() {
   ctx.moveTo(emitter.x, emitter.y);
   ctx.lineTo(emitter.x + 40, emitter.y - 20);
   ctx.stroke();
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "14px Segoe UI";
+  ctx.fillText("Launch desk", emitter.x - 15, emitter.y + 20);
 }
 
 function drawBin() {
-  ctx.fillStyle = "#1f2937";
+  const binGradient = ctx.createLinearGradient(bin.x, bin.y, bin.x, bin.y + bin.height);
+  binGradient.addColorStop(0, "#111827");
+  binGradient.addColorStop(1, "#374151");
+  ctx.fillStyle = binGradient;
   ctx.fillRect(bin.x, bin.y, bin.width, bin.height);
   ctx.fillStyle = "#4b5563";
   ctx.fillRect(bin.x - 6, bin.y, bin.width + 12, 8);
+  ctx.fillStyle = "rgba(248, 250, 252, 0.2)";
+  ctx.fillRect(bin.x + 4, bin.y + 6, bin.width - 8, bin.height - 18);
   ctx.fillStyle = "#f9fafb";
   ctx.fillText("BIN", bin.x + bin.width / 2 - 12, bin.y + bin.height / 2);
 }
 
 function drawProjectile() {
   if (!projectile) return;
+  ctx.shadowColor = "rgba(124, 58, 237, 0.5)";
+  ctx.shadowBlur = 12;
   ctx.save();
   ctx.translate(projectile.x, projectile.y);
   ctx.rotate(projectile.rotation);
@@ -268,6 +318,7 @@ function drawProjectile() {
     ctx.fillRect(-projectile.width / 2, -projectile.height / 2, projectile.width, projectile.height);
   }
   ctx.restore();
+  ctx.shadowBlur = 0;
 }
 
 function drawWind() {
@@ -288,6 +339,45 @@ function drawWind() {
   ctx.fillText("Wind", arrowX - 10, arrowY - 10);
 }
 
+function drawTrajectoryPreview() {
+  if (projectile || throwCount >= maxThrows) return;
+  const angleRad = (Number(angleInput.value) * Math.PI) / 180;
+  const speed = Number(powerInput.value);
+  const selected = garbageOptions[Number(garbageSelect.value)];
+  let previewX = emitter.x;
+  let previewY = emitter.y;
+  let previewVx = Math.cos(angleRad) * speed;
+  let previewVy = -Math.sin(angleRad) * speed;
+  const level = levels[currentLevel];
+  ctx.strokeStyle = "rgba(124, 58, 237, 0.35)";
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath();
+  ctx.moveTo(previewX, previewY);
+  for (let i = 0; i < 60; i += 1) {
+    const dragForceX = -selected.drag * previewVx * Math.abs(previewVx);
+    const dragForceY = -selected.drag * previewVy * Math.abs(previewVy);
+    const ax = (wind + dragForceX) / selected.mass;
+    const ay = level.gravity + dragForceY / selected.mass;
+    previewVx += ax * 0.16;
+    previewVy += ay * 0.16;
+    previewX += previewVx * 0.16;
+    previewY += previewVy * 0.16;
+    ctx.lineTo(previewX, previewY);
+    if (previewY > office.floorY) break;
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawHud() {
+  ctx.fillStyle = "rgba(15, 23, 42, 0.7)";
+  ctx.fillRect(20, 20, 180, 60);
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "14px Segoe UI";
+  ctx.fillText(`Level ${currentLevel + 1}`, 32, 44);
+  ctx.fillText(`Throws left: ${Math.max(maxThrows - throwCount, 0)}`, 32, 64);
+}
+
 function loop(timestamp) {
   const delta = timestamp - lastTime;
   lastTime = timestamp;
@@ -298,21 +388,32 @@ function loop(timestamp) {
   updateUI();
   drawOffice();
   drawWind();
+  drawTrajectoryPreview();
   drawBin();
   drawProjectile();
+  drawHud();
   requestAnimationFrame(loop);
 }
 
 function handleThrow() {
-  if (projectile || throwCount >= 3) return;
+  if (projectile || throwCount >= maxThrows) return;
   projectile = createProjectile();
-  status.textContent = "In flight...";
+  setStatus("In flight...");
 }
 
 angleInput.addEventListener("input", updateUI);
 powerInput.addEventListener("input", updateUI);
 throwBtn.addEventListener("click", handleThrow);
 resetBtn.addEventListener("click", initLevel);
+document.addEventListener("keydown", (event) => {
+  if (event.code === "Space") {
+    event.preventDefault();
+    handleThrow();
+  }
+  if (event.key.toLowerCase() === "r") {
+    initLevel();
+  }
+});
 
 populateGarbage();
 initLevel();
