@@ -17,7 +17,19 @@
 
     <main>
       <section class="game-shell">
-        <canvas id="game" width="900" height="520" aria-label="Garbage throw game"></canvas>
+        <div class="canvas-wrap">
+          <canvas id="game" width="900" height="520" aria-label="Garbage throw game"></canvas>
+          <div class="overlay" id="overlay">
+            <div class="overlay-card">
+              <h2>Welcome to Office Toss</h2>
+              <p>
+                Nail the moving dustbin, learn physics, and build a streak. Wind and
+                drafts change every throw!
+              </p>
+              <button id="startBtn">Start Game</button>
+            </div>
+          </div>
+        </div>
         <div class="panel">
           <div class="panel-section">
             <h2>Throw Controls</h2>
@@ -56,6 +68,8 @@
             <p id="levelInfo"></p>
             <p class="tip" id="physicsTip"></p>
             <p class="stats">Throws left: <span id="throwsLeft"></span></p>
+            <p class="stats">Score: <span id="scoreValue"></span></p>
+            <p class="stats">Streak: <span id="streakValue"></span></p>
             <p class="status" id="status"></p>
           </div>
         </div>

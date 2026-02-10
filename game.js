@@ -17,7 +17,11 @@ const massValue = document.getElementById("massValue");
 const levelInfo = document.getElementById("levelInfo");
 const physicsTip = document.getElementById("physicsTip");
 const throwsLeft = document.getElementById("throwsLeft");
+const scoreValue = document.getElementById("scoreValue");
+const streakValue = document.getElementById("streakValue");
 const status = document.getElementById("status");
+const overlay = document.getElementById("overlay");
+const startBtn = document.getElementById("startBtn");
 
 const office = {
   floorY: 440,
@@ -81,6 +85,10 @@ let gust = 0;
 let gustTimer = 0;
 let lastTime = 0;
 let statusTimeout = null;
+let score = 0;
+let streak = 0;
+let particles = [];
+let gameActive = false;
 
 const emitter = {
   x: office.leftWall + 20,
@@ -101,6 +109,7 @@ function populateGarbage() {
 function initLevel() {
   throwCount = 0;
   projectile = null;
+  particles = [];
   const level = levels[currentLevel];
   bin = {
     x: office.rightWall - 100,
@@ -117,6 +126,13 @@ function initLevel() {
   setStatus("Take your shot!");
 }
 
+function resetLevel(manual = false) {
+  if (manual) {
+    streak = 0;
+  }
+  initLevel();
+}
+
 function updateUI() {
   const level = levels[currentLevel];
   angleValue.textContent = angleInput.value;
@@ -130,6 +146,8 @@ function updateUI() {
   levelInfo.textContent = `Level ${currentLevel + 1}: ${level.name}. Bin size ${level.bin.width}x${level.bin.height}, speed ${level.bin.speed.toFixed(1)}.`;
   physicsTip.textContent = physicsTips[currentLevel % physicsTips.length];
   throwsLeft.textContent = Math.max(maxThrows - throwCount, 0);
+  scoreValue.textContent = score.toString();
+  streakValue.textContent = streak.toString();
 }
 
 function setStatus(message, timeout = 0) {
@@ -158,6 +176,7 @@ function createProjectile() {
     vx,
     vy,
     rotation: 0,
+    spin: (Math.random() * 0.08 + 0.04) * (Math.random() > 0.5 ? 1 : -1),
   };
 }
 
@@ -175,12 +194,13 @@ function updateProjectile(delta) {
   projectile.vy += ay * timeScale;
   projectile.x += projectile.vx * timeScale;
   projectile.y += projectile.vy * timeScale;
-  projectile.rotation += projectile.vx * 0.01;
+  projectile.rotation += projectile.spin;
 
   if (projectile.y > office.floorY - 5) {
     setStatus("Missed! Adjust your throw and try again.", 2000);
     projectile = null;
     throwCount += 1;
+    streak = 0;
     if (throwCount >= maxThrows) {
       setStatus("Three throws used. Reset the level for another try.");
     }
@@ -219,6 +239,9 @@ function checkScoring() {
   const hitY = projectile.y > bin.y && projectile.y < bin.y + bin.height;
   if (hitX && hitY) {
     setStatus("Score! Great physics intuition.", 1500);
+    streak += 1;
+    score += 100 + streak * 25;
+    spawnConfetti(projectile.x, projectile.y);
     projectile = null;
     currentLevel = Math.min(currentLevel + 1, levels.length - 1);
     initLevel();
@@ -286,6 +309,9 @@ function drawOffice() {
   ctx.fillStyle = "#0f172a";
   ctx.font = "14px Segoe UI";
   ctx.fillText("Launch desk", emitter.x - 15, emitter.y + 20);
+
+  ctx.fillStyle = "rgba(15, 23, 42, 0.15)";
+  ctx.fillRect(0, office.floorY - 20, canvas.width, 4);
 }
 
 function drawBin() {
@@ -309,7 +335,10 @@ function drawProjectile() {
   ctx.save();
   ctx.translate(projectile.x, projectile.y);
   ctx.rotate(projectile.rotation);
-  ctx.fillStyle = "#7c3aed";
+  const projectileGradient = ctx.createRadialGradient(0, 0, 2, 0, 0, 18);
+  projectileGradient.addColorStop(0, "#a78bfa");
+  projectileGradient.addColorStop(1, "#5b21b6");
+  ctx.fillStyle = projectileGradient;
   if (projectile.shape === "circle") {
     ctx.beginPath();
     ctx.arc(0, 0, projectile.radius, 0, Math.PI * 2);
@@ -371,20 +400,70 @@ function drawTrajectoryPreview() {
 
 function drawHud() {
   ctx.fillStyle = "rgba(15, 23, 42, 0.7)";
-  ctx.fillRect(20, 20, 180, 60);
+  ctx.fillRect(20, 20, 210, 70);
   ctx.fillStyle = "#f8fafc";
   ctx.font = "14px Segoe UI";
   ctx.fillText(`Level ${currentLevel + 1}`, 32, 44);
   ctx.fillText(`Throws left: ${Math.max(maxThrows - throwCount, 0)}`, 32, 64);
+  ctx.fillText(`Score: ${score}`, 32, 84);
+}
+
+function spawnConfetti(x, y) {
+  const colors = ["#f97316", "#facc15", "#22c55e", "#38bdf8", "#a78bfa"];
+  for (let i = 0; i < 18; i += 1) {
+    particles.push({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 1.2) * 6,
+      radius: Math.random() * 3 + 2,
+      color: colors[i % colors.length],
+      life: 60 + Math.random() * 20,
+    });
+  }
+}
+
+function updateParticles(delta) {
+  const timeScale = delta / 16.67;
+  particles = particles.filter((particle) => particle.life > 0);
+  particles.forEach((particle) => {
+    particle.vy += 0.12 * timeScale;
+    particle.x += particle.vx * timeScale;
+    particle.y += particle.vy * timeScale;
+    particle.life -= 1 * timeScale;
+  });
+}
+
+function drawParticles() {
+  particles.forEach((particle) => {
+    ctx.fillStyle = particle.color;
+    ctx.globalAlpha = Math.max(particle.life / 80, 0);
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
 }
 
 function loop(timestamp) {
   const delta = timestamp - lastTime;
   lastTime = timestamp;
+  if (!gameActive) {
+    drawOffice();
+    drawWind();
+    drawTrajectoryPreview();
+    drawBin();
+    drawProjectile();
+    drawHud();
+    drawParticles();
+    requestAnimationFrame(loop);
+    return;
+  }
   updateBin(delta);
   updateGust(delta);
   updateProjectile(delta);
   checkScoring();
+  updateParticles(delta);
   updateUI();
   drawOffice();
   drawWind();
@@ -392,11 +471,12 @@ function loop(timestamp) {
   drawBin();
   drawProjectile();
   drawHud();
+  drawParticles();
   requestAnimationFrame(loop);
 }
 
 function handleThrow() {
-  if (projectile || throwCount >= maxThrows) return;
+  if (!gameActive || projectile || throwCount >= maxThrows) return;
   projectile = createProjectile();
   setStatus("In flight...");
 }
@@ -404,17 +484,25 @@ function handleThrow() {
 angleInput.addEventListener("input", updateUI);
 powerInput.addEventListener("input", updateUI);
 throwBtn.addEventListener("click", handleThrow);
-resetBtn.addEventListener("click", initLevel);
+resetBtn.addEventListener("click", () => resetLevel(true));
+startBtn.addEventListener("click", () => {
+  gameActive = true;
+  score = 0;
+  streak = 0;
+  overlay.classList.remove("visible");
+  initLevel();
+});
 document.addEventListener("keydown", (event) => {
   if (event.code === "Space") {
     event.preventDefault();
     handleThrow();
   }
   if (event.key.toLowerCase() === "r") {
-    initLevel();
+    resetLevel(true);
   }
 });
 
 populateGarbage();
 initLevel();
+overlay.classList.add("visible");
 requestAnimationFrame(loop);
