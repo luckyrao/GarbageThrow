@@ -1,5 +1,6 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+<<<<<<< ours
 
 const angleInput = document.getElementById("angle");
 const powerInput = document.getElementById("power");
@@ -505,4 +506,392 @@ document.addEventListener("keydown", (event) => {
 populateGarbage();
 initLevel();
 overlay.classList.add("visible");
+=======
+const gameOverEl = document.getElementById("gameOver");
+const finalScoreEl = document.getElementById("finalScore");
+const retryBtn = document.getElementById("retryBtn");
+
+const W = canvas.width;
+const H = canvas.height;
+const floorY = 470;
+const launch = { x: 120, y: floorY - 20 };
+
+const state = {
+  score: 0,
+  highScore: Number(localStorage.getItem("officeTossHighScore") || 0),
+  streak: 0,
+  ballsLeft: 5,
+  throwCount: 0,
+  wind: 0.15,
+  windLabel: "Breeze",
+  projectile: null,
+  particles: [],
+  aiming: false,
+  aimTrail: [],
+  dragStart: null,
+  dragStartTime: 0,
+  bossMoodTimer: 0,
+  bossBubble: "",
+};
+
+const bin = { x: 700, y: floorY - 82, w: 70, h: 82, vx: 1.7, speedTier: 1.7 };
+const boss = { x: 800, y: 210, w: 140, h: 190 };
+const mug = { x: boss.x - 36, y: 320, w: 25, h: 20 };
+
+function pickWind() {
+  const presets = [
+    { v: -0.35, label: "Fan Left" },
+    { v: -0.2, label: "Draft Left" },
+    { v: 0.15, label: "Breeze" },
+    { v: 0.28, label: "Fan Right" },
+    { v: 0.4, label: "Window Gust" },
+  ];
+  const next = presets[Math.floor(Math.random() * presets.length)];
+  state.wind = next.v;
+  state.windLabel = next.label;
+}
+
+function resetRun() {
+  state.score = 0;
+  state.streak = 0;
+  state.ballsLeft = 5;
+  state.throwCount = 0;
+  state.projectile = null;
+  state.particles = [];
+  state.bossMoodTimer = 0;
+  state.bossBubble = "";
+  pickWind();
+  gameOverEl.classList.add("hidden");
+}
+
+function addScore(delta) {
+  state.score += delta;
+  if (state.score > state.highScore) {
+    state.highScore = state.score;
+    localStorage.setItem("officeTossHighScore", String(state.highScore));
+  }
+}
+
+function launchProjectile(vx, vy) {
+  state.projectile = {
+    x: launch.x,
+    y: launch.y,
+    vx,
+    vy,
+    r: 12,
+    spin: (Math.random() - 0.5) * 0.25,
+    rot: 0,
+  };
+}
+
+function doThrowFromDrag(endX, endY) {
+  if (state.ballsLeft <= 0 || state.projectile) return;
+  const dx = state.dragStart.x - endX;
+  const dy = state.dragStart.y - endY;
+  const dist = Math.hypot(dx, dy);
+  const dt = Math.max((performance.now() - state.dragStartTime) / 1000, 0.04);
+  const speedBoost = Math.min(1.8, 0.9 / dt);
+  const power = Math.min(62, Math.max(18, (dist * 0.38) * speedBoost));
+  const angle = Math.atan2(dy, dx);
+  const vx = Math.cos(angle) * power;
+  const vy = -Math.sin(angle) * power;
+  launchProjectile(vx, vy);
+  state.ballsLeft -= 1;
+  state.throwCount += 1;
+  if (state.throwCount % 3 === 0) {
+    pickWind();
+    bin.speedTier += 0.15;
+  }
+}
+
+function spawnConfetti(x, y, count = 22) {
+  for (let i = 0; i < count; i += 1) {
+    state.particles.push({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 1.3) * 6,
+      life: 40 + Math.random() * 25,
+      color: ["#f97316", "#22c55e", "#38bdf8", "#facc15"][i % 4],
+      r: 2 + Math.random() * 2,
+    });
+  }
+}
+
+function rectHit(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function updateProjectile(dt) {
+  const p = state.projectile;
+  if (!p) return;
+
+  p.vx += state.wind * dt * 60;
+  p.vy += 0.45 * dt * 60;
+  p.vx *= 0.995;
+  p.vy *= 0.997;
+
+  p.x += p.vx * dt * 60;
+  p.y += p.vy * dt * 60;
+  p.rot += p.spin;
+
+  const projRect = { x: p.x - p.r, y: p.y - p.r, w: p.r * 2, h: p.r * 2 };
+  const binRect = { x: bin.x + 8, y: bin.y + 8, w: bin.w - 16, h: 18 };
+  const mugRect = { ...mug };
+  const bossRect = { x: boss.x + 10, y: boss.y + 25, w: boss.w - 20, h: boss.h - 25 };
+
+  if (rectHit(projRect, binRect)) {
+    state.streak += 1;
+    const multi = Math.min(3, Math.max(1, state.streak));
+    addScore(10 * multi);
+    spawnConfetti(p.x, p.y, 16);
+    state.projectile = null;
+    return;
+  }
+
+  if (rectHit(projRect, mugRect)) {
+    addScore(50);
+    spawnConfetti(p.x, p.y, 30);
+    state.projectile = null;
+    return;
+  }
+
+  if (rectHit(projRect, bossRect)) {
+    state.streak = 0;
+    state.bossMoodTimer = 90;
+    state.bossBubble = "HEY! Watch it!";
+    state.projectile = null;
+    return;
+  }
+
+  if (p.y + p.r >= floorY) {
+    addScore(-5);
+    state.streak = 0;
+    state.projectile = null;
+  }
+}
+
+function updateBin(dt) {
+  bin.x += bin.vx * bin.speedTier * dt * 60;
+  if (bin.x < 470 || bin.x + bin.w > W - 30) bin.vx *= -1;
+}
+
+function updateParticles(dt) {
+  state.particles = state.particles.filter((pt) => pt.life > 0);
+  state.particles.forEach((pt) => {
+    pt.vy += 0.13 * dt * 60;
+    pt.x += pt.vx * dt * 60;
+    pt.y += pt.vy * dt * 60;
+    pt.life -= 1 * dt * 60;
+  });
+}
+
+function drawOffice() {
+  ctx.clearRect(0, 0, W, H);
+
+  // 2.5D/isometric style floor lines
+  ctx.fillStyle = "#d1d5db";
+  ctx.fillRect(0, floorY, W, H - floorY);
+  ctx.strokeStyle = "rgba(100,116,139,0.45)";
+  for (let i = -W; i < W * 2; i += 55) {
+    ctx.beginPath();
+    ctx.moveTo(i, H);
+    ctx.lineTo(i + 220, floorY);
+    ctx.stroke();
+  }
+
+  // back wall + desk
+  ctx.fillStyle = "#e2e8f0";
+  ctx.fillRect(560, 180, 350, 210);
+  ctx.fillStyle = "#7c2d12";
+  ctx.fillRect(640, 350, 240, 34);
+
+  // fan (wind source)
+  const fanX = state.wind > 0 ? 70 : W - 90;
+  ctx.fillStyle = "#334155";
+  ctx.beginPath();
+  ctx.arc(fanX, 100, 28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#38bdf8";
+  for (let i = 0; i < 3; i += 1) {
+    ctx.beginPath();
+    ctx.moveTo(fanX, 100);
+    ctx.lineTo(fanX + Math.cos((Date.now() / 150 + i * 2.1)) * 34, 100 + Math.sin((Date.now() / 150 + i * 2.1)) * 34);
+    ctx.stroke();
+  }
+
+  // boss
+  const angry = state.bossMoodTimer > 0;
+  ctx.fillStyle = angry ? "#dc2626" : "#2563eb";
+  ctx.fillRect(boss.x + 40, boss.y + 55, 58, 105);
+  ctx.fillStyle = "#fcd34d";
+  ctx.beginPath();
+  ctx.arc(boss.x + 68, boss.y + 34, 28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#111827";
+  ctx.fillRect(boss.x + 30, boss.y + 160, 78, 24);
+
+  // mug
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillRect(mug.x, mug.y, mug.w, mug.h);
+  ctx.strokeStyle = "#334155";
+  ctx.strokeRect(mug.x + 20, mug.y + 4, 8, 10);
+
+  if (angry) {
+    ctx.fillStyle = "#fee2e2";
+    ctx.fillRect(boss.x - 60, boss.y - 10, 120, 32);
+    ctx.fillStyle = "#7f1d1d";
+    ctx.font = "14px Inter";
+    ctx.fillText(state.bossBubble, boss.x - 52, boss.y + 11);
+  }
+
+  // bin
+  const g = ctx.createLinearGradient(bin.x, bin.y, bin.x, bin.y + bin.h);
+  g.addColorStop(0, "#1f2937");
+  g.addColorStop(1, "#4b5563");
+  ctx.fillStyle = g;
+  ctx.fillRect(bin.x, bin.y, bin.w, bin.h);
+  ctx.fillStyle = "#6b7280";
+  ctx.fillRect(bin.x - 5, bin.y, bin.w + 10, 8);
+
+  // launch zone
+  ctx.strokeStyle = "#0f172a";
+  ctx.setLineDash([5, 6]);
+  ctx.strokeRect(launch.x - 42, launch.y - 32, 84, 64);
+  ctx.setLineDash([]);
+  ctx.font = "13px Inter";
+  ctx.fillStyle = "#111827";
+  ctx.fillText("FLICK ZONE", launch.x - 34, launch.y + 50);
+}
+
+function drawProjectile() {
+  const p = state.projectile;
+  if (!p) return;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.rot);
+  const g = ctx.createRadialGradient(0, 0, 1, 0, 0, p.r + 4);
+  g.addColorStop(0, "#fef3c7");
+  g.addColorStop(1, "#d97706");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, p.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawAimingTrail() {
+  if (state.aimTrail.length < 2) return;
+  for (let i = 1; i < state.aimTrail.length; i += 1) {
+    const a = state.aimTrail[i - 1];
+    const b = state.aimTrail[i];
+    const alpha = i / state.aimTrail.length;
+    ctx.strokeStyle = `rgba(124,58,237,${alpha * 0.45})`;
+    ctx.lineWidth = 2 + alpha * 3;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+}
+
+function drawParticles() {
+  state.particles.forEach((pt) => {
+    ctx.globalAlpha = Math.max(pt.life / 70, 0);
+    ctx.fillStyle = pt.color;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  ctx.font = "700 20px Orbitron, Inter";
+  ctx.fillStyle = "#e2e8f0";
+  ctx.fillText(`SCORE ${state.score}`, 18, 34);
+  ctx.fillText(`STREAK x${Math.max(1, state.streak)}`, 18, 62);
+
+  ctx.textAlign = "right";
+  ctx.fillText(`HIGH ${state.highScore}`, W - 18, 34);
+  ctx.fillText(`BALLS ${state.ballsLeft}`, W - 18, 62);
+  ctx.fillText(`WIND ${state.windLabel}`, W - 18, 90);
+  ctx.textAlign = "left";
+}
+
+function setGameOverIfNeeded() {
+  if (state.ballsLeft <= 0 && !state.projectile) {
+    finalScoreEl.textContent = `Score: ${state.score} • High Score: ${state.highScore}`;
+    gameOverEl.classList.remove("hidden");
+  }
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.033);
+  last = now;
+
+  updateBin(dt);
+  updateProjectile(dt);
+  updateParticles(dt);
+
+  if (state.bossMoodTimer > 0) state.bossMoodTimer -= 1;
+  if (!state.aiming && state.aimTrail.length > 0) {
+    state.aimTrail.shift();
+  }
+
+  drawOffice();
+  drawAimingTrail();
+  drawProjectile();
+  drawParticles();
+  drawHUD();
+  setGameOverIfNeeded();
+
+  requestAnimationFrame(loop);
+}
+
+function pointerPos(event) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX ?? event.touches?.[0]?.clientX ?? event.changedTouches?.[0]?.clientX) - rect.left;
+  const y = (event.clientY ?? event.touches?.[0]?.clientY ?? event.changedTouches?.[0]?.clientY) - rect.top;
+  return { x, y };
+}
+
+function onStart(event) {
+  if (state.ballsLeft <= 0 || state.projectile) return;
+  const p = pointerPos(event);
+  state.aiming = true;
+  state.dragStart = p;
+  state.dragStartTime = performance.now();
+  state.aimTrail = [p];
+}
+
+function onMove(event) {
+  if (!state.aiming) return;
+  const p = pointerPos(event);
+  state.aimTrail.push(p);
+  if (state.aimTrail.length > 14) state.aimTrail.shift();
+}
+
+function onEnd(event) {
+  if (!state.aiming) return;
+  const p = pointerPos(event);
+  doThrowFromDrag(p.x, p.y);
+  state.aiming = false;
+}
+
+canvas.addEventListener("mousedown", onStart);
+canvas.addEventListener("mousemove", onMove);
+window.addEventListener("mouseup", onEnd);
+canvas.addEventListener("touchstart", (e) => { e.preventDefault(); onStart(e); }, { passive: false });
+canvas.addEventListener("touchmove", (e) => { e.preventDefault(); onMove(e); }, { passive: false });
+canvas.addEventListener("touchend", (e) => { e.preventDefault(); onEnd(e); }, { passive: false });
+
+retryBtn.addEventListener("click", resetRun);
+window.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "r") resetRun();
+});
+
+resetRun();
+>>>>>>> theirs
 requestAnimationFrame(loop);

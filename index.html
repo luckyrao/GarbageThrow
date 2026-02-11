@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<<<<<<< ours
     <title>Office Toss Physics Lab</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -71,10 +72,25 @@
             <p class="stats">Score: <span id="scoreValue"></span></p>
             <p class="stats">Streak: <span id="streakValue"></span></p>
             <p class="status" id="status"></p>
+=======
+    <title>Office Toss: Boss Revenge</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="stage-wrap">
+        <canvas id="game" width="980" height="560" aria-label="Office Toss Boss Revenge"></canvas>
+        <div id="gameOver" class="overlay hidden">
+          <div class="card">
+            <h1>Out of Paper Balls!</h1>
+            <p id="finalScore"></p>
+            <button id="retryBtn">Try Again</button>
+>>>>>>> theirs
           </div>
         </div>
       </section>
 
+<<<<<<< ours
       <section class="instructions">
         <h2>How to Play</h2>
         <ol>
@@ -94,6 +110,23 @@
       <p>Built as a fun physics playground for all ages.</p>
     </footer>
 
+=======
+      <aside class="panel">
+        <h2>Office Toss: Boss Revenge</h2>
+        <p>
+          Flick from the launch zone and release to throw. Wind changes every 3 throws,
+          and the bin keeps moving.
+        </p>
+        <ul>
+          <li>+10 Bin</li>
+          <li>+50 Mug</li>
+          <li>-5 Floor miss</li>
+        </ul>
+        <p>Boss hit triggers an angry reaction!</p>
+      </aside>
+    </main>
+
+>>>>>>> theirs
     <script src="game.js"></script>
   </body>
 </html>
